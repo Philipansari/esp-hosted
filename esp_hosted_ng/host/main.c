@@ -24,7 +24,8 @@
 
 #define RELEASE_VERSION "1.0.3"
 #define HOST_GPIO_PIN_INVALID -1
-static int resetpin = HOST_GPIO_PIN_INVALID;
+#define ESP_RST_PIN 90  // CUSTOM CHANGE OPTIONAL added this line
+static int resetpin = ESP_RST_PIN; // ADJUST THIS LINE ALSO
 static u32 clockspeed = 0;
 extern u8 ap_bssid[MAC_ADDR_LEN];
 extern volatile u8 host_sleep;
@@ -357,10 +358,17 @@ static int esp_set_mac_address(struct net_device *ndev, void *data)
 
 	esp_info("%u "MACSTR"\n", __LINE__, MAC2STR(sa->sa_data));
 
-	ret = cmd_set_mac(priv, sa->sa_data);
-
-	if (ret == 0)
-		eth_hw_addr_set(ndev, priv->mac_address/*mac_addr->sa_data*/);
+	// Check if the MAC address is all zeros
+    if (is_zero_ether_addr(sa->sa_data)) {
+        esp_info("MAC address is all zeros - ignoring request\n");
+		ret = cmd_get_mac(priv);
+		if (ret == 0)
+			eth_hw_addr_set(ndev, priv->mac_address/*mac_addr->sa_data*/);
+    } else {
+		ret = cmd_set_mac(priv, sa->sa_data);
+		if (ret == 0)
+			eth_hw_addr_set(ndev, priv->mac_address/*mac_addr->sa_data*/);
+	}
 
 	return ret;
 }
