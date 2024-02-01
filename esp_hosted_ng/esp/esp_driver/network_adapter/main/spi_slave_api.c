@@ -138,8 +138,10 @@ static const char TAG[] = "FW_SPI";
 
 static interface_context_t context;
 static interface_handle_t if_handle_g;
-static uint8_t gpio_handshake = CONFIG_ESP_SPI_GPIO_HANDSHAKE;
-static uint8_t gpio_data_ready = CONFIG_ESP_SPI_GPIO_DATA_READY;
+// static uint8_t gpio_handshake = CONFIG_ESP_SPI_GPIO_HANDSHAKE;
+// static uint8_t gpio_data_ready = CONFIG_ESP_SPI_GPIO_DATA_READY;
+static uint8_t gpio_handshake = 4; // CUSTOM CHANGE
+static uint8_t gpio_data_ready = 5; // CUSTOM CHANGE
 static QueueHandle_t spi_rx_queue[MAX_PRIORITY_QUEUES] = {NULL};
 static QueueHandle_t spi_tx_queue[MAX_PRIORITY_QUEUES] = {NULL};
 
