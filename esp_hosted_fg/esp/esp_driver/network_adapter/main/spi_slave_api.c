@@ -130,8 +130,10 @@ static const char TAG[] = "SPI_DRIVER";
  * ESP32-C6: 26MHz
  */
 
-#define GPIO_HS                    CONFIG_ESP_SPI_GPIO_HANDSHAKE
-#define GPIO_DR                    CONFIG_ESP_SPI_GPIO_DATA_READY
+// #define GPIO_HS                    CONFIG_ESP_SPI_GPIO_HANDSHAKE
+// #define GPIO_DR                    CONFIG_ESP_SPI_GPIO_DATA_READY
+#define GPIO_HS                      4
+#define GPIO_DR                      5
 
 
 #define GPIO_MASK_DATA_READY (1 << GPIO_DR)
