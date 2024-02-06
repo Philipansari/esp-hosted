@@ -50,7 +50,8 @@ volatile u8 stop_data = 0;
  * do not reset ESP32.
  */
 #define HOST_GPIO_PIN_INVALID -1
-static int resetpin = HOST_GPIO_PIN_INVALID;
+#define ESP_RST_PIN 90  // CUSTOM CHANGE OPTIONAL added this line
+static int resetpin = ESP_RST_PIN; // ADJUST THIS LINE ALSO
 
 module_param(resetpin, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(resetpin, "Host's GPIO pin number which is connected to ESP32's EN to reset ESP32 device");
