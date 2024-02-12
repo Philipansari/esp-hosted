@@ -625,8 +625,8 @@ static interface_handle_t * esp_spi_init(void)
 	/* Enable pull-ups on SPI lines
 	 * so that no rogue pulses when no master is connected
 	 */
-	gpio_set_pull_mode(CONFIG_ESP_SPI_GPIO_HANDSHAKE, GPIO_PULLDOWN_ONLY);
-	gpio_set_pull_mode(CONFIG_ESP_SPI_GPIO_DATA_READY, GPIO_PULLDOWN_ONLY);
+	gpio_set_pull_mode(GPIO_HS, GPIO_PULLDOWN_ONLY);
+	gpio_set_pull_mode(GPIO_DR, GPIO_PULLDOWN_ONLY);
 	gpio_set_pull_mode(GPIO_MOSI, GPIO_PULLUP_ONLY);
 	gpio_set_pull_mode(GPIO_SCLK, GPIO_PULLUP_ONLY);
 	gpio_set_pull_mode(GPIO_CS, GPIO_PULLUP_ONLY);
