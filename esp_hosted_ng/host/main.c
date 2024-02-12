@@ -24,8 +24,8 @@
 
 #define RELEASE_VERSION "1.0.3"
 #define HOST_GPIO_PIN_INVALID -1
-#define ESP_RST_PIN 90  // CUSTOM CHANGE OPTIONAL added this line
-static int resetpin = ESP_RST_PIN; // ADJUST THIS LINE ALSO
+#define ESP_RST_PIN 111
+static int resetpin = ESP_RST_PIN;
 static u32 clockspeed = 0;
 extern u8 ap_bssid[MAC_ADDR_LEN];
 extern volatile u8 host_sleep;

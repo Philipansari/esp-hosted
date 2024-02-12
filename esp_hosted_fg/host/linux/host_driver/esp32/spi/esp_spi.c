@@ -29,7 +29,7 @@
 #include "esp_kernel_port.h"
 #include "esp_stats.h"
 
-#define SPI_INITIAL_CLK_MHZ     10 // CUSTOM CHANGE
+#define SPI_INITIAL_CLK_MHZ     10
 #define NUMBER_1M               1000000
 #define TX_MAX_PENDING_COUNT    100
 #define TX_RESUME_THRESHOLD     (TX_MAX_PENDING_COUNT/5)
@@ -380,7 +380,7 @@ static void esp_spi_transaction(void)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0))
 			if (hardware_type == ESP_PRIV_FIRMWARE_CHIP_ESP32) {
-				// trans.cs_change = 1; // CUSTOM CHANGE
+				trans.cs_change = 1;
 			}
 #endif
 			ret = spi_sync_transfer(spi_context.esp_spi_dev, &trans, 1);
@@ -463,8 +463,8 @@ static int spi_dev_init(int spi_clk_mhz)
 	strscpy(esp_board.modalias, "esp_spi", sizeof(esp_board.modalias));
 	esp_board.mode = SPI_MODE_2;
 	esp_board.max_speed_hz = spi_clk_mhz * NUMBER_1M;
-	esp_board.bus_num = 0; // CUSTOM CHANGE OPTIONAL select the correct SPI bus number
-	esp_board.chip_select = 0; // CUSTOM CHANGE OPTIONAL select the correct SPI device on the bus
+	esp_board.bus_num = 0;
+	esp_board.chip_select = 0;
 
 	master = spi_busnum_to_master(esp_board.bus_num);
 	if (!master) {

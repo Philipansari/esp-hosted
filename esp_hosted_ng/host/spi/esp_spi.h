@@ -9,9 +9,9 @@
 
 #include "esp.h"
 
-#define HANDSHAKE_PIN           88 // CUSTOM CHANGE REQUIRED adjust PIN to our hardware layout
+#define HANDSHAKE_PIN           88
 #define SPI_IRQ                 gpio_to_irq(HANDSHAKE_PIN)
-#define SPI_DATA_READY_PIN      81 // CUSTOM CHANGE REQUIRED adjust PIN to our hardware layout
+#define SPI_DATA_READY_PIN      81
 #define SPI_DATA_READY_IRQ      gpio_to_irq(SPI_DATA_READY_PIN)
 #define SPI_BUF_SIZE            1600
 
