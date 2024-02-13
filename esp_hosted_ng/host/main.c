@@ -483,7 +483,7 @@ static int esp_add_network_ifaces(struct esp_adapter *adapter)
 	}
 
 	rtnl_lock();
-	wdev = esp_cfg80211_add_iface(adapter->wiphy, "espsta%d", 1, NL80211_IFTYPE_STATION, NULL);
+	wdev = esp_cfg80211_add_iface(adapter->wiphy, "wlan%d", 1, NL80211_IFTYPE_STATION, NULL);
 	rtnl_unlock();
 
 	/* Return success if network added successfully */

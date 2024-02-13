@@ -122,7 +122,7 @@ static int esp_inetaddr_event(struct notifier_block *nb,
 
 	/*esp_info("------- IP event -------: %d\n", priv->if_type);*/
 
-	if (!strstr(netdev->name, "espsta")) {
+	if (!strstr(netdev->name, "wlan")) {
 		return 0;
 	}
 
