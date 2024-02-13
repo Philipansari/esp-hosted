@@ -138,8 +138,13 @@ static const char TAG[] = "FW_SPI";
 
 static interface_context_t context;
 static interface_handle_t if_handle_g;
-static uint8_t gpio_handshake = 4;
-static uint8_t gpio_data_ready = 5;
+#if defined CONFIG_IDF_TARGET_ESP32C3
+static uint8_t gpio_handshake = 4; // CONFIG_ESP_SPI_GPIO_HANDSHAKE
+static uint8_t gpio_data_ready = 5; // CONFIG_ESP_SPI_GPIO_DATA_READY
+#elif defined CONFIG_IDF_TARGET_ESP32S3
+static uint8_t gpio_handshake = 2; // CONFIG_ESP_SPI_GPIO_HANDSHAKE
+static uint8_t gpio_data_ready = 4; // CONFIG_ESP_SPI_GPIO_DATA_READY
+#endif
 static QueueHandle_t spi_rx_queue[MAX_PRIORITY_QUEUES] = {NULL};
 static QueueHandle_t spi_tx_queue[MAX_PRIORITY_QUEUES] = {NULL};
 

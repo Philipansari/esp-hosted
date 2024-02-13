@@ -130,10 +130,13 @@ static const char TAG[] = "SPI_DRIVER";
  * ESP32-C6: 26MHz
  */
 
-// #define GPIO_HS                    CONFIG_ESP_SPI_GPIO_HANDSHAKE
-// #define GPIO_DR                    CONFIG_ESP_SPI_GPIO_DATA_READY
-#define GPIO_HS                      4
-#define GPIO_DR                      5
+#if defined CONFIG_IDF_TARGET_ESP32C3
+#define GPIO_HS                      4 // CONFIG_ESP_SPI_GPIO_HANDSHAKE
+#define GPIO_DR                      5 // CONFIG_ESP_SPI_GPIO_DATA_READY
+#elif defined CONFIG_IDF_TARGET_ESP32S3
+#define GPIO_HS                      2 // CONFIG_ESP_SPI_GPIO_HANDSHAKE
+#define GPIO_DR                      4 // CONFIG_ESP_SPI_GPIO_DATA_READY
+#endif
 
 
 #define GPIO_MASK_DATA_READY (1 << GPIO_DR)
@@ -642,8 +645,8 @@ static interface_handle_t * esp_spi_init(void)
 	ret=spi_slave_initialize(ESP_SPI_CONTROLLER, &buscfg, &slvcfg, DMA_CHAN);
 	assert(ret==ESP_OK);
 
-	//gpio_set_drive_capability(CONFIG_ESP_SPI_GPIO_HANDSHAKE, GPIO_DRIVE_CAP_3);
-	//gpio_set_drive_capability(CONFIG_ESP_SPI_GPIO_DATA_READY, GPIO_DRIVE_CAP_3);
+	//gpio_set_drive_capability(GPIO_HS, GPIO_DRIVE_CAP_3);
+	//gpio_set_drive_capability(GPIO_DR, GPIO_DRIVE_CAP_3);
 	gpio_set_drive_capability(GPIO_SCLK, GPIO_DRIVE_CAP_3);
 	gpio_set_drive_capability(GPIO_MISO, GPIO_DRIVE_CAP_3);
 	gpio_set_pull_mode(GPIO_MISO, GPIO_PULLDOWN_ONLY);
