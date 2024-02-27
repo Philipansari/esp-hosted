@@ -113,6 +113,30 @@ static const struct wiphy_wowlan_support esp_wowlan_support = {
 	.max_pkt_offset = 0,
 };
 
+/* TODO get MAX_TX_POWER_MBM from Firmware for future chips */
+#define MAX_TX_POWER_MBM (20 * 100)
+#define MIN_TX_POWER_MBM (8 * 100)
+static bool is_txpwr_valid(int mbm)
+{
+	if (mbm > MAX_TX_POWER_MBM)
+		return false;
+
+	if (mbm < MIN_TX_POWER_MBM)
+		return false;
+
+	return true;
+}
+
+static int mbm_to_esp_pwr(int mbm)
+{
+	return ((mbm * 4) / 100);
+}
+
+static int esp_pwr_to_dbm(int power)
+{
+	return ((power / 4));
+}
+
 static int esp_inetaddr_event(struct notifier_block *nb,
 	unsigned long event, void *data)
 {
@@ -120,7 +144,7 @@ static int esp_inetaddr_event(struct notifier_block *nb,
 	struct net_device *netdev = ifa->ifa_dev ? ifa->ifa_dev->dev : NULL;
 	struct esp_wifi_device *priv = netdev_priv(netdev);
 
-	/*esp_info("------- IP event -------: %d\n", priv->if_type);*/
+	esp_verbose("------- IP event -------\n");
 
 	if (!strstr(netdev->name, "wlan")) {
 		return 0;
@@ -137,9 +161,10 @@ static int esp_inetaddr_event(struct notifier_block *nb,
 		break;
 
 	case NETDEV_DOWN:
-		esp_info("Interface Down: %d\n", priv->if_type);
-		if (priv && (priv->if_type == ESP_STA_IF))
+		if (priv && (priv->if_type == ESP_STA_IF)) {
 			cmd_set_ip_address(priv, 0);
+			esp_info("Interface Down: %d\n", priv->if_type);
+		}
 		break;
 	}
 
@@ -195,8 +220,9 @@ struct wireless_dev *esp_cfg80211_add_iface(struct wiphy *wiphy,
 	esp_wdev->ndev = ndev;
 	esp_wdev->adapter = esp_dev->adapter;
 	esp_wdev->adapter->priv[esp_nw_if_num] = esp_wdev;
-	/*esp_info("Updated priv[%u] to %px\n",
-	 * esp_nw_if_num, esp_wdev->adapter->priv[esp_nw_if_num]);*/
+	esp_wdev->tx_pwr = mbm_to_esp_pwr(MAX_TX_POWER_MBM);
+	esp_verbose("Updated priv[%u] to %px\n",
+                esp_nw_if_num, esp_wdev->adapter->priv[esp_nw_if_num]);
 	dev_net_set(ndev, wiphy_net(wiphy));
 	SET_NETDEV_DEV(ndev, wiphy_dev(esp_wdev->wdev.wiphy));
 	esp_wdev->wdev.netdev = ndev;
@@ -476,26 +502,6 @@ static void esp_cfg80211_set_wakeup(struct wiphy *wiphy,
 	/*esp_dbg("\n");*/
 }
 
-/* TODO get MAX_TX_POWER_MBM from Firmware for future chips */
-#define MAX_TX_POWER_MBM (20 * 100)
-static bool is_txpwr_valid(int mbm)
-{
-	if (mbm > MAX_TX_POWER_MBM)
-		return false;
-
-	return true;
-}
-
-static int mbm_to_esp_pwr(int mbm)
-{
-	return ((mbm * 4) / 100);
-}
-
-static int esp_pwr_to_dbm(int power)
-{
-	return ((power / 4));
-}
-
 static int esp_cfg80211_set_tx_power(struct wiphy *wiphy,
 				     struct wireless_dev *wdev,
 				     enum nl80211_tx_power_setting type, int mbm)
@@ -524,7 +530,7 @@ static int esp_cfg80211_set_tx_power(struct wiphy *wiphy,
         case NL80211_TX_POWER_LIMITED:
                 if (!is_txpwr_valid(mbm)) {
                         esp_warn("mbm:%d not support\n", mbm);
-			return -EOPNOTSUPP;
+			return -EINVAL;
                 }
                 priv->tx_pwr_type = NL80211_TX_POWER_LIMITED;
                 priv->tx_pwr = mbm_to_esp_pwr(mbm);
@@ -590,6 +596,8 @@ static int esp_cfg80211_get_tx_power(struct wiphy *wiphy,
 		esp_err("Empty priv\n");
 		return -EINVAL;
 	}
+	/* Update Tx power from firmware */
+	//cmd_get_tx_power(priv);
 
 	*dbm = esp_pwr_to_dbm(priv->tx_pwr);
 
