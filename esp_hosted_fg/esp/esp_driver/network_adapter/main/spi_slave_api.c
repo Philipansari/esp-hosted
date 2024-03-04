@@ -645,8 +645,8 @@ static interface_handle_t * esp_spi_init(void)
 	ret=spi_slave_initialize(ESP_SPI_CONTROLLER, &buscfg, &slvcfg, DMA_CHAN);
 	assert(ret==ESP_OK);
 
-	//gpio_set_drive_capability(GPIO_HS, GPIO_DRIVE_CAP_3);
-	//gpio_set_drive_capability(GPIO_DR, GPIO_DRIVE_CAP_3);
+	gpio_set_drive_capability(GPIO_HS, GPIO_DRIVE_CAP_3);
+	gpio_set_drive_capability(GPIO_DR, GPIO_DRIVE_CAP_3);
 	gpio_set_drive_capability(GPIO_SCLK, GPIO_DRIVE_CAP_3);
 	gpio_set_drive_capability(GPIO_MISO, GPIO_DRIVE_CAP_3);
 	gpio_set_pull_mode(GPIO_MISO, GPIO_PULLDOWN_ONLY);
