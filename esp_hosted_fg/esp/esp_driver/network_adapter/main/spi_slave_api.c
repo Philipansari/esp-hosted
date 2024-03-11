@@ -381,6 +381,15 @@ static uint8_t * get_next_tx_buffer(uint32_t *len)
 			if (pdFALSE == xQueueReceive(spi_tx_queue[PRIO_Q_BT], &buf_handle, 0))
 				if (pdFALSE == xQueueReceive(spi_tx_queue[PRIO_Q_OTHERS], &buf_handle, 0))
 					ret = pdFALSE;
+	
+	// You can then check the number of messages waiting in each queue
+	// int queue1 = uxQueueMessagesWaiting(spi_tx_queue[PRIO_Q_SERIAL]);
+	// int queue2 = uxQueueMessagesWaiting(spi_tx_queue[PRIO_Q_BT]);
+	// int queue3 = uxQueueMessagesWaiting(spi_tx_queue[PRIO_Q_OTHERS]);
+
+	// if (queue1 || queue2 || queue3) {
+	// 	ESP_LOGI("CNT", "%d, %d, %d", queue1, queue2, queue3);
+	// }
 
 	if (ret == pdTRUE && buf_handle.payload) {
 		if (len)
@@ -745,6 +754,17 @@ static int32_t esp_spi_write(interface_handle_t *handle, interface_buffer_handle
 		xQueueSend(spi_tx_queue[PRIO_Q_BT], &tx_buf_handle, portMAX_DELAY);
 	else
 		xQueueSend(spi_tx_queue[PRIO_Q_OTHERS], &tx_buf_handle, portMAX_DELAY);
+
+	// ESP_LOGI("LEN", "%d", tx_buf_handle.payload_len);
+	// if (tx_buf_handle.payload_len > 27) {
+	// 	if (tx_buf_handle.payload_len < 128) {
+	// 		ESP_LOG_BUFFER_HEX("BUF+28", tx_buf_handle.payload + 28, tx_buf_handle.payload_len - 28);
+	// 	} else {
+	// 		ESP_LOG_BUFFER_HEX("BUF+28", tx_buf_handle.payload + 28, 100);
+	// 	}
+	// } else {
+	// 	ESP_LOG_BUFFER_HEX("BUF", tx_buf_handle.payload, tx_buf_handle.payload_len);
+	// }
 
 	xSemaphoreGive(spi_tx_sem);
 
