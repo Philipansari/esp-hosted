@@ -11,6 +11,8 @@
 #include <linux/kernel.h>
 #include <linux/gpio.h>
 #include <linux/igmp.h>
+#include <linux/fs.h>
+#include <asm/uaccess.h>
 
 #include "esp.h"
 #include "esp_if.h"
@@ -31,6 +33,8 @@ static u32 clockspeed = 0;
 extern u8 ap_bssid[MAC_ADDR_LEN];
 extern volatile u8 host_sleep;
 u32 raw_tp_mode = 0;
+
+#define FILEPATH_MAC "/sys/firmware/devicetree/base/soc/aips-bus@2000000/spba-bus@2000000/spi@2008000/local-mac-address"
 
 module_param(resetpin, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(resetpin, "Host's GPIO pin number which is connected to ESP32's EN to reset ESP32 device");
@@ -362,6 +366,36 @@ static struct net_device_stats *esp_get_stats(struct net_device *ndev)
 	return &priv->stats;
 }
 
+int read_mac_from_device_tree(unsigned char *mac_addr) {
+    struct file *f;
+    loff_t pos = 0;
+    int ret = 0, read_size;
+
+    // Ensure NULL termination of the MAC address array
+    memset(mac_addr, 0, ETH_ALEN);
+
+    // Open the file
+    f = filp_open(FILEPATH_MAC, O_RDONLY, 0);
+    if (IS_ERR(f)) {
+        esp_err("Cannot open device tree file %s\n", FILEPATH_MAC);
+        return PTR_ERR(f);
+    }
+
+    // Read the MAC address
+    read_size = kernel_read(f, mac_addr, ETH_ALEN, &pos);
+
+    // Check for read errors
+    if (read_size != ETH_ALEN) {
+        esp_err("Failed to read MAC address from %s\n", FILEPATH_MAC);
+        ret = -EIO;
+    }
+
+    // Close the file
+    filp_close(f, NULL);
+
+    return ret;
+}
+
 static int esp_set_mac_address(struct net_device *ndev, void *data)
 {
 	struct esp_wifi_device *priv = netdev_priv(ndev);
@@ -371,18 +405,23 @@ static int esp_set_mac_address(struct net_device *ndev, void *data)
 	if (!priv || !priv->adapter)
 		return -EINVAL;
 
-	esp_info("%u "MACSTR"\n", __LINE__, MAC2STR(sa->sa_data));
+    // Read MAC address from device tree
+    unsigned char mac_addr[ETH_ALEN];
+    ret = read_mac_from_device_tree(mac_addr);
+    if (ret != 0) {
+        esp_err("Failed to read MAC address from device tree");
+    }
 
 	// Check if the MAC address is all zeros
-    if (is_zero_ether_addr(sa->sa_data)) {
+    if (is_zero_ether_addr(mac_addr)) {
         esp_info("MAC address is all zeros - ignoring request\n");
 		ret = cmd_get_mac(priv);
 		if (ret == 0)
 			eth_hw_addr_set(ndev, priv->mac_address/*mac_addr->sa_data*/);
     } else {
-		ret = cmd_set_mac(priv, sa->sa_data);
+		ret = cmd_set_mac(priv, mac_addr);
 		if (ret == 0)
-			eth_hw_addr_set(ndev, priv->mac_address/*mac_addr->sa_data*/);
+			eth_hw_addr_set(ndev, mac_addr);
 	}
 
 	return ret;
