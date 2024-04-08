@@ -25,6 +25,7 @@
 #include "endian.h"
 #include "esp_private/wifi.h"
 #include "esp_wpa.h"
+#include "app_main.h"
 #include "esp_wifi.h"
 #include "esp_wifi_driver.h"
 #include "esp_event.h"
@@ -65,11 +66,16 @@ static esp_event_handler_instance_t instance_any_id;
 static uint8_t *ap_bssid;
 extern uint32_t ip_address;
 extern struct macfilter_list mac_list;
+extern uint8_t sta_mac[MAC_ADDR_LEN];
+extern uint8_t ap_mac[MAC_ADDR_LEN];
 
 esp_err_t esp_wifi_register_mgmt_frame_internal(uint32_t type, uint32_t subtype);
 int esp_wifi_register_wpa_cb_internal(struct wpa_funcs *cb);
 int esp_wifi_unregister_wpa_cb_internal(void);
 extern esp_err_t wlan_sta_rx_callback(void *buffer, uint16_t len, void *eb);
+extern volatile uint8_t power_save_on;
+extern void wake_host();
+extern struct wow_config wow;
 
 extern int wpa_parse_wpa_ie(const u8 *wpa_ie, size_t wpa_ie_len, wifi_wpa_ie_t *data);
 static inline void WPA_PUT_LE16(u8 *a, u16 val)
@@ -154,6 +160,15 @@ int station_rx_eapol(uint8_t *src_addr, uint8_t *buf, uint32_t len)
 		ESP_LOGI(TAG, "Failed to get own sta MAC addr\n");
 		return ESP_FAIL;
 	}
+
+#if CONFIG_ESP_SDIO_HOST_INTERFACE
+	if (power_save_on && wow.four_way_handshake) {
+		ESP_LOGI(TAG, "Wakeup on FourWayHandshake");
+		wake_host();
+		buf_handle.flag = 0xFF;
+		sleep(1);
+	}
+#endif
 
 	/* Check destination address against self address */
 	if (memcmp(ap_bssid, src_addr, MAC_ADDR_LEN)) {
@@ -303,7 +318,7 @@ DONE:
 	return;
 }
 
-void handle_sta_disconnected_event(wifi_event_sta_disconnected_t *disconnected)
+void handle_sta_disconnected_event(wifi_event_sta_disconnected_t *disconnected, bool wakeup_flag)
 {
 	interface_buffer_handle_t buf_handle = {0};
 	struct disconnect_event *event;
@@ -328,6 +343,9 @@ void handle_sta_disconnected_event(wifi_event_sta_disconnected_t *disconnected)
 	memcpy(event->bssid, disconnected->bssid, MAC_ADDR_LEN);
 	event->reason = disconnected->reason;
 
+	if (wakeup_flag) {
+		buf_handle.flag = 0xFF;
+	}
 	ret = send_command_event(&buf_handle);
 	if (ret != pdTRUE) {
 		ESP_LOGE(TAG, "Slave -> Host: Failed to send disconnect event\n");
@@ -420,6 +438,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 	int32_t event_id, void* event_data)
 {
 	esp_err_t result;
+	bool wakeup_flag = false;
 
 	if (event_base != WIFI_EVENT) {
 		ESP_LOGI(TAG, "Received unregistered event %s[%ld]\n", event_base, event_id);
@@ -455,7 +474,16 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 			ESP_LOGE(TAG, "%s:%u NULL data", __func__, __LINE__);
 			return;
 		}
-		handle_sta_disconnected_event((wifi_event_sta_disconnected_t*) event_data);
+#if CONFIG_ESP_SDIO_HOST_INTERFACE
+		if (power_save_on && wow.disconnect) {
+		/* Wake-up host always on disconnect */
+			ESP_LOGI(TAG, "Wakeup on disconnect");
+			wake_host();
+			wakeup_flag = true;
+			sleep(1);
+		}
+#endif
+		handle_sta_disconnected_event((wifi_event_sta_disconnected_t*) event_data, wakeup_flag);
 		station_connected = 0;
 		/*esp_wifi_internal_reg_rxcb(ESP_IF_WIFI_STA, NULL);*/
 		break;
@@ -939,6 +967,61 @@ DONE:
 
 	return ret;
 }
+
+int process_wow_set(uint8_t if_type, uint8_t *payload, uint16_t payload_len)
+{
+	interface_buffer_handle_t buf_handle = {0};
+	esp_err_t ret = ESP_OK;
+	struct cmd_wow_config *cmd;
+
+	cmd = (struct cmd_wow_config *)payload;
+
+	wow.any = cmd->any;
+	wow.disconnect = cmd->disconnect;
+	wow.magic_pkt = cmd->magic_pkt;
+	wow.four_way_handshake = cmd->four_way_handshake;
+	wow.eap_identity_req = cmd->eap_identity_req;
+
+	if (cmd->any) {
+		wow.disconnect = 1;
+		wow.magic_pkt = 1;
+		wow.four_way_handshake = 1;
+		wow.eap_identity_req = 1;
+	}
+
+	buf_handle.if_type = if_type;
+	buf_handle.if_num = 0;
+	buf_handle.payload_len = sizeof(struct cmd_wow_config);
+	buf_handle.pkt_type = PACKET_TYPE_COMMAND_RESPONSE;
+
+	buf_handle.payload = heap_caps_malloc(buf_handle.payload_len, MALLOC_CAP_DMA);
+	assert(buf_handle.payload);
+	memset(buf_handle.payload, 0, buf_handle.payload_len);
+
+	cmd = (struct cmd_wow_config *)(buf_handle.payload);
+	cmd->header.cmd_code = CMD_SET_WOW_CONFIG;
+	cmd->header.len = 0;
+	cmd->header.cmd_status = CMD_RESPONSE_SUCCESS;
+
+	buf_handle.priv_buffer_handle = buf_handle.payload;
+	buf_handle.free_buf_handle = free;
+
+	ret = send_command_response(&buf_handle);
+	if (ret != pdTRUE) {
+		ESP_LOGE(TAG, "Slave -> Host: Failed to send command response\n");
+		goto DONE;
+	}
+
+	return ESP_OK;
+
+DONE:
+	if (buf_handle.payload)
+		free(buf_handle.payload);
+
+	return ret;
+}
+
+
 
 int process_reg_set(uint8_t if_type, uint8_t *payload, uint16_t payload_len)
 {
@@ -1515,9 +1598,10 @@ int process_get_mac(uint8_t if_type)
 	uint8_t mac[MAC_ADDR_LEN];
 
 	if (if_type == ESP_STA_IF) {
-		wifi_if_type |= WIFI_IF_STA;
+		wifi_if_type = WIFI_IF_STA;
+
 	} else {
-		wifi_if_type |= WIFI_IF_AP;
+		wifi_if_type = WIFI_IF_AP;
 	}
 
 	ret = esp_wifi_get_mac(wifi_if_type, mac);
@@ -1526,6 +1610,12 @@ int process_get_mac(uint8_t if_type)
 		ESP_LOGE(TAG, "Failed to get mac address\n");
 		cmd_status = CMD_RESPONSE_FAIL;
 	}
+	if (if_type == ESP_STA_IF) {
+		memcpy(sta_mac, mac, MAC_ADDR_LEN);
+	} else {
+		memcpy(ap_mac, mac, MAC_ADDR_LEN);
+	}
+
 
 	/*ESP_LOG_BUFFER_HEXDUMP(TAG, mac, MAC_ADDR_LEN, ESP_LOG_INFO);*/
 
@@ -1580,8 +1670,10 @@ int process_set_mac(uint8_t if_type, uint8_t *payload, uint16_t payload_len)
 
 	if (if_type == ESP_STA_IF) {
 		wifi_if_type = WIFI_IF_STA;
+		memcpy(sta_mac, mac->mac_addr, MAC_ADDR_LEN);
 	} else {
 		wifi_if_type = WIFI_IF_AP;
+		memcpy(ap_mac, mac->mac_addr, MAC_ADDR_LEN);
 	}
 
 
