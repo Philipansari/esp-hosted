@@ -617,6 +617,18 @@ static int spi_init(void)
 		return status;
 	}
 
+	// -- WORKAROUND START
+	/* serial needs to be cleanup in order to work properly on the first start -> clear and init again */
+	esp_serial_cleanup();
+
+	status = esp_serial_init((void *) spi_context.adapter);
+	if (status != 0) {
+		spi_exit();
+		esp_err("Error initialising serial interface\n");
+		return status;
+	}
+	// -- WORKAROUND END
+
 	spi_context.adapter->state = ESP_CONTEXT_READY;
 
 	msleep(200);
