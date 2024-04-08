@@ -24,6 +24,7 @@
 
 #define RELEASE_VERSION "1.0.3"
 #define HOST_GPIO_PIN_INVALID -1
+#define CONFIG_ALLOW_MULTICAST_WAKEUP 1
 #define ESP_RST_PIN 111
 static int resetpin = ESP_RST_PIN;
 static u32 clockspeed = 0;
