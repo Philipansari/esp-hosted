@@ -85,7 +85,7 @@ static const char TAG[] = "FW_SPI";
 	#define GPIO_CS 			10
 	#define DMA_CHAN			SPI_DMA_CH_AUTO
 
-	#define SPI_CLK_MHZ			10
+	#define SPI_CLK_MHZ			30
 
 #elif defined CONFIG_IDF_TARGET_ESP32S3
 
