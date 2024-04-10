@@ -12,6 +12,12 @@
 #include "esp_cmd.h"
 #include "esp_kernel_port.h"
 
+#include <linux/fs.h>
+#include <asm/uaccess.h>
+
+#define FILEPATH_MAC "/sys/firmware/devicetree/base/soc/aips-bus@2000000/spba-bus@2000000/spi@2008000/local-mac-address"
+
+
 /**
   * @brief WiFi PHY rate encodings
   *
@@ -171,6 +177,66 @@ static int esp_inetaddr_event(struct notifier_block *nb,
 	return 0;
 }
 
+int read_mac_from_tree(unsigned char *mac_addr) {
+    struct file *f;
+    loff_t pos = 0;
+    int ret = 0, read_size;
+
+    // Ensure NULL termination of the MAC address array
+    memset(mac_addr, 0, ETH_ALEN);
+
+    // Open the file
+    f = filp_open(FILEPATH_MAC, O_RDONLY, 0);
+    if (IS_ERR(f)) {
+        esp_err("Cannot open device tree file %s\n", FILEPATH_MAC);
+        return PTR_ERR(f);
+    }
+
+    // Read the MAC address
+    read_size = kernel_read(f, mac_addr, ETH_ALEN, &pos);
+
+    // Check for read errors
+    if (read_size != ETH_ALEN) {
+        esp_err("Failed to read MAC address from %s\n", FILEPATH_MAC);
+        ret = -EIO;
+    }
+
+    // Close the file
+    filp_close(f, NULL);
+
+    return ret;
+}
+
+static int configure_mac_addr(struct esp_wifi_device* priv, struct net_device *ndev) {
+	int ret;
+
+	if (!priv || !priv->adapter)
+		return -EINVAL;
+
+    // Read MAC address from device tree
+    unsigned char mac_addr[ETH_ALEN];
+    ret = read_mac_from_tree(mac_addr);
+    if (ret != 0) {
+        esp_err("Failed to read MAC address from device tree");
+    }
+
+	// Check if the MAC address is all zeros
+    if (is_zero_ether_addr(mac_addr)) {
+        esp_info("MAC address is all zeros - ignoring request\n");
+		ret = cmd_get_mac(priv);
+		if (ret == 0)
+			esp_info("%u "MACSTR"\n", __LINE__, MAC2STR(priv->mac_address));
+			eth_hw_addr_set(ndev, priv->mac_address/*mac_addr->sa_data*/);
+    } else {
+		esp_info("%u "MACSTR"\n", __LINE__, MAC2STR(mac_addr));
+		ret = cmd_set_mac(priv, mac_addr);
+		if (ret == 0)
+			eth_hw_addr_set(ndev, mac_addr);
+	}
+
+	return ret;
+}
+
 struct wireless_dev *esp_cfg80211_add_iface(struct wiphy *wiphy,
 		const char *name,
 		unsigned char name_assign_type,
@@ -234,11 +300,16 @@ struct wireless_dev *esp_cfg80211_add_iface(struct wiphy *wiphy,
 
 	if (cmd_init_interface(esp_wdev))
 		goto free_and_return;
-
-	if (cmd_get_mac(esp_wdev))
+	
+	// configure mac address based on device tree
+	if (configure_mac_addr(esp_wdev, ndev)) {
 		goto free_and_return;
+	}
+	
+	// if (cmd_get_mac(esp_wdev))
+	// 	goto free_and_return;
 
-	eth_hw_addr_set(ndev, esp_wdev->mac_address);
+	// eth_hw_addr_set(ndev, esp_wdev->mac_address);
 
 	esp_init_priv(ndev);
 

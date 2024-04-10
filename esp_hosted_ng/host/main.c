@@ -417,8 +417,10 @@ static int esp_set_mac_address(struct net_device *ndev, void *data)
         esp_info("MAC address is all zeros - ignoring request\n");
 		ret = cmd_get_mac(priv);
 		if (ret == 0)
+			esp_info("%u "MACSTR"\n", __LINE__, MAC2STR(priv->mac_address));
 			eth_hw_addr_set(ndev, priv->mac_address/*mac_addr->sa_data*/);
     } else {
+		esp_info("%u "MACSTR"\n", __LINE__, MAC2STR(mac_addr));
 		ret = cmd_set_mac(priv, mac_addr);
 		if (ret == 0)
 			eth_hw_addr_set(ndev, mac_addr);
